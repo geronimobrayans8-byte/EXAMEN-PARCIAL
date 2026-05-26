@@ -1,0 +1,46 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Definición de los datos del experimento (f en Hz, |Z| en ohmios)
+# Se extraen los 30 pares de datos de la tabla proporcionada.
+f = np.array([
+    100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
+    460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
+    1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730
+])
+
+Z = np.array([
+    152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
+    132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
+    135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2
+])
+
+# 2. Identificación del mínimo local mediante funciones de numpy
+indice_min = np.argmin(Z)
+f_min = f[indice_min]
+z_min = Z[indice_min]
+
+# 3. Creación del gráfico
+plt.figure(figsize=(10, 6))
+
+# Graficamos los puntos de datos con marcadores y una línea suave para ver la tendencia
+plt.plot(f, Z, marker='o', linestyle='-', color='b', label='Datos medidos $|Z|(f)$')
+
+# Resaltamos el punto mínimo en el gráfico con un color distinto
+plt.plot(f_min, z_min, marker='s', color='r', markersize=8, 
+         label=f'Mínimo local: ({f_min} Hz, {z_min:.4f} $\Omega$)')
+
+# 4. Configuración estética del gráfico
+plt.title('Magnitud de Impedancia Bioeléctrica vs. Frecuencia', fontsize=14)
+plt.xlabel('Frecuencia $f$ (Hz)', fontsize=12)
+plt.ylabel('Impedancia $|Z|$ ($\Omega$)', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend(fontsize=11)
+
+# Mostrar el gráfico
+plt.show()
+
+# Imprimir los resultados numéricos solicitados con 4 decimales
+print(f"--- RESULTADOS NUMÉRICOS ---")
+print(f"Frecuencia del mínimo estimado: {f_min:.4f} Hz")
+print(f"Magnitud de impedancia mínima: {z_min:.4f} Ohmios")
