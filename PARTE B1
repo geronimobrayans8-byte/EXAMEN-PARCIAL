@@ -1,0 +1,111 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import lagrange, CubicSpline
+import warnings
+
+# Suprimir advertencias de inestabilidad numérica esperadas por grados altos
+warnings.simplefilter('ignore', np.RankWarning)
+
+# 1. Datos del experimento
+f = np.array([
+    100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
+    460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
+    1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730
+])
+
+Z = np.array([
+    152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
+    132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
+    135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2
+])
+
+f_eval = np.linspace(min(f), max(f), 500) # Malla fina para evaluar
+
+# ==========================================
+# PARTE B1: INTERPOLACIÓN POLINÓMICA
+# ==========================================
+
+# Polinomio de grado 29 (Interpolación exacta)
+# Nota: np.polyfit usa el método matricial (Vandermonde)
+coef_29 = np.polyfit(f, Z, 29)
+poly_29 = np.poly1d(coef_29)
+
+# Polinomios escalonados (aproximaciones de menor grado)
+poly_5 = np.poly1d(np.polyfit(f, Z, 5))
+poly_10 = np.poly1d(np.polyfit(f, Z, 10))
+poly_15 = np.poly1d(np.polyfit(f, Z, 15))
+
+# Gráfico B1: Evidencia del Fenómeno de Runge
+plt.figure(figsize=(12, 7))
+plt.plot(f, Z, 'ko', label='Datos originales')
+plt.plot(f_eval, poly_5(f_eval), 'b-', label='Grado 5')
+plt.plot(f_eval, poly_10(f_eval), 'g--', label='Grado 10')
+plt.plot(f_eval, poly_15(f_eval), 'm-.', label='Grado 15')
+plt.plot(f_eval, poly_29(f_eval), 'r:', linewidth=2, label='Grado 29 (Oscilaciones)')
+
+plt.ylim(100, 200) # Restringir Y para ver las oscilaciones sin perder escala
+plt.title('B1: Comparación de Polinomios (Fenómeno de Runge)', fontsize=14)
+plt.xlabel('Frecuencia (Hz)')
+plt.ylabel('Magnitud de Impedancia (Ohmios)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Validación Leave-One-Out (LOO) con 5 puntos al azar para el polinomio seleccionado (Grado 5)
+np.random.seed(42) # Semilla para reproducibilidad
+indices_loo = np.random.choice(len(f), 5, replace=False)
+errores_relativos = []
+
+print("\n--- PROCEDIMIENTO LOO (Polinomio Grado 5) ---")
+for idx in indices_loo:
+    # Separar el punto de prueba
+    f_test, Z_test = f[idx], Z[idx]
+    
+    # Crear conjunto de entrenamiento (eliminando el punto test)
+    f_train = np.delete(f, idx)
+    Z_train = np.delete(Z, idx)
+    
+    # Entrenar modelo con grado 5
+    poly_train = np.poly1d(np.polyfit(f_train, Z_train, 5))
+    
+    # Predecir y calcular error
+    Z_pred = poly_train(f_test)
+    error_rel = abs((Z_test - Z_pred) / Z_test) * 100
+    errores_relativos.append(error_rel)
+    print(f"Punto omitido: f = {f_test} Hz | Z_real = {Z_test} | Z_pred = {Z_pred:.4f} | Error: {error_rel:.4f}%")
+
+error_loo_promedio = np.mean(errores_relativos)
+print(f"Error relativo promedio estimado (LOO): {error_loo_promedio:.4f}%")
+
+# Interpolación en f = 1000 Hz con el polinomio seleccionado (Grado 5)
+Z_1000_poly = poly_5(1000)
+print(f"\nValor interpolado con Polinomio (Grado 5) en 1000 Hz: {Z_1000_poly:.4f} Ohmios")
+
+
+# ==========================================
+# PARTE B2: SPLINES CÚBICOS NATURALES
+# ==========================================
+
+# Construcción del Spline Cúbico Natural
+spline_natural = CubicSpline(f, Z, bc_type='natural')
+
+# Gráfico B2: Spline vs Polinomio Seleccionado
+plt.figure(figsize=(12, 7))
+plt.plot(f, Z, 'ko', label='Datos originales')
+plt.plot(f_eval, spline_natural(f_eval), 'b-', linewidth=2, label='Spline Cúbico Natural')
+plt.plot(f_eval, poly_5(f_eval), 'r--', label='Polinomio Grado 5')
+
+# Resaltar la interpolación en 1000 Hz
+Z_1000_spline = spline_natural(1000)
+plt.plot(1000, Z_1000_spline, 'g^', markersize=10, label=f'Spline en 1000 Hz: {Z_1000_spline:.4f}')
+plt.plot(1000, Z_1000_poly, 'rv', markersize=10, label=f'Polinomio en 1000 Hz: {Z_1000_poly:.4f}')
+
+plt.title('B2: Spline Cúbico Natural vs Polinomio', fontsize=14)
+plt.xlabel('Frecuencia (Hz)')
+plt.ylabel('Magnitud de Impedancia (Ohmios)')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+print(f"\n--- RESULTADOS B2 ---")
+print(f"Valor interpolado con Spline Cúbico en 1000 Hz: {Z_1000_spline:.4f} Ohmios")
