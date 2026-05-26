@@ -1,111 +1,105 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import lagrange, CubicSpline
-import warnings
 
-# Suprimir advertencias de inestabilidad numérica esperadas por grados altos
-warnings.simplefilter('ignore', np.RankWarning)
+# --- DATOS DEL EXPERIMENTO ---
+f = np.array([100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
+              460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
+              1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730])
+Z = np.array([152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
+              132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
+              135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2])
 
-# 1. Datos del experimento
-f = np.array([
-    100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
-    460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
-    1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730
-])
+# --- FUNCIONES DE INTERPOLACIÓN ---
 
-Z = np.array([
-    152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
-    132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
-    135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2
-])
+def matrix_interp(x_nodes, y_nodes, x_eval):
+    """
+    Interpolación mediante el Método Matricial (Vandermonde).
+    Resuelve el sistema V * a = Y para obtener los coeficientes.
+    """
+    # np.polyfit usa mínimos cuadrados (SVD) que es más robusto numéricamente
+    # que invertir directamente la matriz de Vandermonde para grados altos.
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', np.RankWarning)
+        coefs = np.polyfit(x_nodes, y_nodes, len(x_nodes) - 1)
+    return np.polyval(coefs, x_eval)
 
-f_eval = np.linspace(min(f), max(f), 500) # Malla fina para evaluar
+def lagrange_interp(x_nodes, y_nodes, x_eval):
+    """
+    Interpolación mediante el método de Lagrange.
+    Evita la inversión de matrices, reduciendo errores de redondeo iniciales.
+    """
+    y_eval = np.zeros_like(x_eval, dtype=float)
+    for i in range(len(x_nodes)):
+        L_i = np.ones_like(x_eval, dtype=float)
+        for j in range(len(x_nodes)):
+            if i != j:
+                L_i *= (x_eval - x_nodes[j]) / (x_nodes[i] - x_nodes[j])
+        y_eval += y_nodes[i] * L_i
+    return y_eval
 
-# ==========================================
-# PARTE B1: INTERPOLACIÓN POLINÓMICA
-# ==========================================
+# --- COMPARACIÓN DE GRADOS Y FENÓMENO DE RUNGE ---
+f_dense = np.linspace(min(f), max(f), 1000)
 
-# Polinomio de grado 29 (Interpolación exacta)
-# Nota: np.polyfit usa el método matricial (Vandermonde)
-coef_29 = np.polyfit(f, Z, 29)
-poly_29 = np.poly1d(coef_29)
+# Extraemos subconjuntos de puntos para generar diferentes grados
+idx_5 = np.linspace(0, 29, 6, dtype=int)   # 6 puntos -> Grado 5
+idx_10 = np.linspace(0, 29, 11, dtype=int) # 11 puntos -> Grado 10
+idx_15 = np.linspace(0, 29, 16, dtype=int) # 16 puntos -> Grado 15
 
-# Polinomios escalonados (aproximaciones de menor grado)
-poly_5 = np.poly1d(np.polyfit(f, Z, 5))
-poly_10 = np.poly1d(np.polyfit(f, Z, 10))
-poly_15 = np.poly1d(np.polyfit(f, Z, 15))
+# Evaluamos los polinomios
+Z_deg5 = lagrange_interp(f[idx_5], Z[idx_5], f_dense)
+Z_deg10 = lagrange_interp(f[idx_10], Z[idx_10], f_dense)
+Z_deg15 = lagrange_interp(f[idx_15], Z[idx_15], f_dense)
+Z_deg29 = lagrange_interp(f, Z, f_dense) # Todo el rango
 
-# Gráfico B1: Evidencia del Fenómeno de Runge
-plt.figure(figsize=(12, 7))
-plt.plot(f, Z, 'ko', label='Datos originales')
-plt.plot(f_eval, poly_5(f_eval), 'b-', label='Grado 5')
-plt.plot(f_eval, poly_10(f_eval), 'g--', label='Grado 10')
-plt.plot(f_eval, poly_15(f_eval), 'm-.', label='Grado 15')
-plt.plot(f_eval, poly_29(f_eval), 'r:', linewidth=2, label='Grado 29 (Oscilaciones)')
+# Gráfico
+plt.figure(figsize=(10, 6))
+plt.plot(f, Z, 'ko', label='Datos Originales')
+plt.plot(f_dense, Z_deg5, label='Grado 5 (6 ptos)', linestyle='--')
+plt.plot(f_dense, Z_deg10, label='Grado 10 (11 ptos)', linestyle='-.')
+plt.plot(f_dense, Z_deg15, label='Grado 15 (16 ptos)', alpha=0.8)
+plt.plot(f_dense, Z_deg29, label='Grado 29 (30 ptos)', color='red', alpha=0.5)
 
-plt.ylim(100, 200) # Restringir Y para ver las oscilaciones sin perder escala
-plt.title('B1: Comparación de Polinomios (Fenómeno de Runge)', fontsize=14)
-plt.xlabel('Frecuencia (Hz)')
-plt.ylabel('Magnitud de Impedancia (Ohmios)')
+# Limitamos el eje Y para poder ver la curva (el grado 29 se dispara a miles)
+plt.ylim(100, 200) 
+plt.title('Interpolación Polinómica y Fenómeno de Runge')
+plt.xlabel('Frecuencia f (Hz)')
+plt.ylabel('Impedancia |Z| ($\Omega$)')
 plt.legend()
 plt.grid(True)
 plt.show()
 
-# Validación Leave-One-Out (LOO) con 5 puntos al azar para el polinomio seleccionado (Grado 5)
-np.random.seed(42) # Semilla para reproducibilidad
-indices_loo = np.random.choice(len(f), 5, replace=False)
-errores_relativos = []
+# --- CÁLCULO DE |Z| EN f = 1000 Hz ---
+# Seleccionamos el Grado 10 como "adecuado" (captura el valle sin oscilar violentamente)
+Z_1000 = lagrange_interp(f[idx_10], Z[idx_10], np.array([1000.0]))[0]
+print(f"\n--- RESULTADO DE INTERPOLACIÓN ---")
+print(f"Valor interpolado en f = 1000 Hz (Polinomio Grado 10): {Z_1000:.4f} Ohmios")
 
-print("\n--- PROCEDIMIENTO LOO (Polinomio Grado 5) ---")
-for idx in indices_loo:
-    # Separar el punto de prueba
-    f_test, Z_test = f[idx], Z[idx]
+# --- VALIDACIÓN LEAVE-ONE-OUT (LOO) ---
+# Seleccionamos 5 puntos al azar (evitando los extremos 0 y 29 para no extrapolar)
+np.random.seed(42) 
+random_indices = np.random.choice(range(1, 29), 5, replace=False)
+
+loo_errors = []
+print("\n--- VALIDACIÓN LEAVE-ONE-OUT (LOO) ---")
+for idx in random_indices:
+    f_test = f[idx]
+    Z_true = Z[idx]
     
-    # Crear conjunto de entrenamiento (eliminando el punto test)
-    f_train = np.delete(f, idx)
-    Z_train = np.delete(Z, idx)
+    # Retiramos el punto de prueba de los datos disponibles
+    f_train_pool = np.delete(f, idx)
+    Z_train_pool = np.delete(Z, idx)
     
-    # Entrenar modelo con grado 5
-    poly_train = np.poly1d(np.polyfit(f_train, Z_train, 5))
+    # Seleccionamos 11 puntos (para mantener el Grado 10) del pool restante
+    idx_train = np.linspace(0, len(f_train_pool)-1, 11, dtype=int)
     
-    # Predecir y calcular error
-    Z_pred = poly_train(f_test)
-    error_rel = abs((Z_test - Z_pred) / Z_test) * 100
-    errores_relativos.append(error_rel)
-    print(f"Punto omitido: f = {f_test} Hz | Z_real = {Z_test} | Z_pred = {Z_pred:.4f} | Error: {error_rel:.4f}%")
+    # Predecimos
+    Z_pred = lagrange_interp(f_train_pool[idx_train], Z_train_pool[idx_train], np.array([f_test]))[0]
+    
+    # Calculamos error relativo
+    error_relativo = abs(Z_pred - Z_true) / Z_true
+    loo_errors.append(error_relativo)
+    print(f"Test en f = {f_test:4d} Hz | Z_real = {Z_true:.4f} | Z_pred = {Z_pred:.4f} | Error = {error_relativo:.4%}")
 
-error_loo_promedio = np.mean(errores_relativos)
-print(f"Error relativo promedio estimado (LOO): {error_loo_promedio:.4f}%")
-
-# Interpolación en f = 1000 Hz con el polinomio seleccionado (Grado 5)
-Z_1000_poly = poly_5(1000)
-print(f"\nValor interpolado con Polinomio (Grado 5) en 1000 Hz: {Z_1000_poly:.4f} Ohmios")
-
-
-# ==========================================
-# PARTE B2: SPLINES CÚBICOS NATURALES
-# ==========================================
-
-# Construcción del Spline Cúbico Natural
-spline_natural = CubicSpline(f, Z, bc_type='natural')
-
-# Gráfico B2: Spline vs Polinomio Seleccionado
-plt.figure(figsize=(12, 7))
-plt.plot(f, Z, 'ko', label='Datos originales')
-plt.plot(f_eval, spline_natural(f_eval), 'b-', linewidth=2, label='Spline Cúbico Natural')
-plt.plot(f_eval, poly_5(f_eval), 'r--', label='Polinomio Grado 5')
-
-# Resaltar la interpolación en 1000 Hz
-Z_1000_spline = spline_natural(1000)
-plt.plot(1000, Z_1000_spline, 'g^', markersize=10, label=f'Spline en 1000 Hz: {Z_1000_spline:.4f}')
-plt.plot(1000, Z_1000_poly, 'rv', markersize=10, label=f'Polinomio en 1000 Hz: {Z_1000_poly:.4f}')
-
-plt.title('B2: Spline Cúbico Natural vs Polinomio', fontsize=14)
-plt.xlabel('Frecuencia (Hz)')
-plt.ylabel('Magnitud de Impedancia (Ohmios)')
-plt.legend()
-plt.grid(True)
-plt.show()
-
-print(f"\n--- RESULTADOS B2 ---")
-print(f"Valor interpolado con Spline Cúbico en 1000 Hz: {Z_1000_spline:.4f} Ohmios")
+mean_loo_error = np.mean(loo_errors)
+print(f"\nError relativo promedio estimado (LOO): {mean_loo_error:.4%}")
