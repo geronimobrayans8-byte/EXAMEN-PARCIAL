@@ -1,0 +1,63 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import CubicSpline
+from scipy.optimize import root_scalar
+
+# --- 1. DATOS DEL EXPERIMENTO ---
+f = np.array([100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
+              460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
+              1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730])
+Z = np.array([152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
+              132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
+              135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2])
+
+# --- 2. CONSTRUCCIÓN DEL SPLINE Y SUS DERIVADAS ANALÍTICAS ---
+spline = CubicSpline(f, Z, bc_type='natural')
+
+# Obtenemos las funciones analíticas de la 1ra y 2da derivada del spline
+spline_d1 = spline.derivative(1) # d|Z|/df
+spline_d2 = spline.derivative(2) # d^2|Z|/df^2
+
+# Calculamos la 1ra derivada en todos los puntos de datos (nodos)
+Z_prime_nodos = spline_d1(f)
+
+# --- 3. BÚSQUEDA DEL MÍNIMO EXACTO ---
+# Buscamos la raíz de la 1ra derivada (donde cruza de negativo a positivo)
+# Sabemos por la Parte A que el mínimo está cerca de los 730 Hz.
+# Usamos un método de búsqueda de raíces en el intervalo [600, 900]
+raiz_d1 = root_scalar(spline_d1, bracket=[600, 900])
+f_min_exacto = raiz_d1.root
+
+# --- 4. CÁLCULO DE LA 2DA DERIVADA EN EL MÍNIMO ---
+Z_d2_min = spline_d2(f_min_exacto)
+
+# --- 5. GRÁFICO DE LA PRIMERA DERIVADA ---
+f_malla = np.linspace(min(f), max(f), 1000)
+Z_prime_malla = spline_d1(f_malla)
+
+plt.figure(figsize=(10, 6))
+
+# Gráfico continuo de la derivada
+plt.plot(f_malla, Z_prime_malla, 'b-', label='d|Z|/df (Spline Analítico)', zorder=2)
+
+# Puntos de datos evaluados
+plt.plot(f, Z_prime_nodos, 'ko', label='Derivada en nodos', zorder=3)
+
+# Línea de cruce por cero (referencia)
+plt.axhline(0, color='black', linestyle='--', linewidth=1, zorder=1)
+
+# Marcamos el punto donde la derivada es cero
+plt.plot(f_min_exacto, 0, 'rs', markersize=8, 
+         label=f'Cruce por cero ($f = {f_min_exacto:.4f}$ Hz)', zorder=4)
+
+plt.title('Derivada Primera de la Impedancia respecto a la Frecuencia', fontsize=14)
+plt.xlabel('Frecuencia f (Hz)', fontsize=12)
+plt.ylabel('d|Z|/df ($\Omega$/Hz)', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend(fontsize=11)
+plt.show()
+
+# --- 6. IMPRESIÓN DE RESULTADOS NUMÉRICOS ---
+print("\n--- RESULTADOS NUMÉRICOS ---")
+print(f"Frecuencia exacta del mínimo (d|Z|/df = 0): {f_min_exacto:.4f} Hz")
+print(f"Segunda derivada d²|Z|/df² en f_min:       {Z_d2_min:.4f} Ohmios/Hz²")
