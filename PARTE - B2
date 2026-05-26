@@ -1,0 +1,69 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.interpolate import CubicSpline
+
+# --- 1. DATOS DEL EXPERIMENTO ---
+f = np.array([100, 120, 145, 170, 200, 235, 270, 310, 355, 405, 
+              460, 520, 585, 655, 730, 810, 895, 985, 1080, 1180, 
+              1290, 1410, 1540, 1680, 1830, 1990, 2160, 2340, 2530, 2730])
+Z = np.array([152.3, 149.1, 146.8, 144.9, 142.0, 139.5, 137.9, 136.1, 134.8, 133.6, 
+              132.7, 131.9, 131.4, 131.1, 130.9, 131.0, 131.3, 131.9, 132.7, 133.8, 
+              135.2, 136.9, 138.9, 141.1, 143.5, 146.1, 149.0, 152.2, 155.6, 159.2])
+
+# --- 2. CONSTRUCCIÓN DEL SPLINE CÚBICO NATURAL ---
+# Usamos bc_type='natural' para imponer que las segundas derivadas sean 0 en los extremos.
+spline_natural = CubicSpline(f, Z, bc_type='natural')
+
+# --- 3. RECONSTRUCCIÓN DEL POLINOMIO DE GRADO 10 (De la Parte B1) ---
+# Seleccionamos 11 puntos equiespaciados en índices para recrear el polinomio adecuado
+idx_10 = np.linspace(0, 29, 11, dtype=int)
+f_poly = f[idx_10]
+Z_poly = Z[idx_10]
+
+def lagrange_interp(x_nodes, y_nodes, x_eval):
+    y_eval = np.zeros_like(x_eval, dtype=float)
+    for i in range(len(x_nodes)):
+        L_i = np.ones_like(x_eval, dtype=float)
+        for j in range(len(x_nodes)):
+            if i != j:
+                L_i *= (x_eval - x_nodes[j]) / (x_nodes[i] - x_nodes[j])
+        y_eval += y_nodes[i] * L_i
+    return y_eval
+
+# --- 4. EVALUACIÓN EN MALLA FINA ---
+# Creamos una malla fina de 1000 puntos para una visualización suave
+f_malla = np.linspace(min(f), max(f), 1000)
+
+Z_spline_eval = spline_natural(f_malla)
+Z_poly_eval = lagrange_interp(f_poly, Z_poly, f_malla)
+
+# --- 5. GRÁFICO COMPARATIVO ---
+plt.figure(figsize=(10, 6))
+
+# Datos originales
+plt.plot(f, Z, 'ko', label='Datos Originales (30 ptos)', zorder=3)
+
+# Curva del Spline
+plt.plot(f_malla, Z_spline_eval, 'b-', linewidth=2, label='Spline Cúbico Natural', zorder=2)
+
+# Curva del Polinomio Grado 10
+plt.plot(f_malla, Z_poly_eval, 'r--', linewidth=2, label='Polinomio (Grado 10)', zorder=1)
+
+# Punto de evaluación específico (1000 Hz)
+f_eval = 1000
+Z_spline_1000 = spline_natural(f_eval)
+plt.plot(f_eval, Z_spline_1000, 'gs', markersize=8, label=f'Spline a 1000 Hz: {Z_spline_1000:.4f} $\Omega$', zorder=4)
+
+plt.title('Comparación: Spline Cúbico Natural vs Polinomio', fontsize=14)
+plt.xlabel('Frecuencia f (Hz)', fontsize=12)
+plt.ylabel('Impedancia |Z| ($\Omega$)', fontsize=12)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend(fontsize=11)
+plt.show()
+
+# --- 6. CÁLCULOS NUMÉRICOS SOLICITADOS ---
+Z_poly_1000 = lagrange_interp(f_poly, Z_poly, np.array([f_eval]))[0]
+
+print("\n--- RESULTADOS NUMÉRICOS ---")
+print(f"|Z| en f = 1000 Hz usando Spline Cúbico Natural: {Z_spline_1000:.4f} Ohmios")
+print(f"|Z| en f = 1000 Hz usando Polinomio (Grado 10):  {Z_poly_1000:.4f} Ohmios")
